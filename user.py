@@ -8,7 +8,7 @@ def hash_password(password: str) -> str:
     """
     Parolayı hashlib.sha256 kullanarak hash'ler (Güvenlik gereksinimi).
     """
-    # Parolayı byte dizisine dönüştür ve SHA256 algoritmasıyla şifrele
+    # Parolayı byte dizisine dönüştür ve SHA256 algoritmasıyla şifrelw
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 def register_user(users: dict, profile: dict) -> dict | None:
@@ -23,19 +23,19 @@ def register_user(users: dict, profile: dict) -> dict | None:
     if username in users: # Benzersiz kullanıcı adı kontrolü
         print(f"Hata: '{username}' kullanıcı adı zaten mevcut.")
         return None
-    if initial_deposit < 0: # Başlangıç depozitosunun negatif olmasını engelle
+    if initial_deposit < 0: # Başlangıç ın negatif olmasını engelle
         print("Hata: Başlangıç depozitosu negatif olamaz.")
         return None
 
     # Yeni kullanıcı için veri modelini oluşturur
     new_user = {
         "username": username,
-        "hashed_password": hash_password(password), # Hashlenmiş parola saklanır (güvenli)
+        "hashed_password": hash_password(password), # Hashlenmiş parola saklanır 
         "full_name": profile.get("full_name", "N/A"),
         "balance": initial_deposit, # Müşterinin bakiyesi
         "created_at": datetime.now().isoformat(), # Hesabın oluşturulma zamanı
         "last_login": None,
-        "transactions": [], # İşlem geçmişi listesi (2. Hafta)
+        "transactions": [], # İşlem geçmişi listesi 
         "login_attempts": 0, # Başarısız giriş denemesi sayacı
         "locked": False # Hesap kilit durumu
     }
@@ -81,3 +81,12 @@ def login_user(users: dict, username: str, password: str) -> dict | None:
 def logout_user(active_sessions: dict, username: str) -> None:
     """Kullanıcının oturumunu kapatır."""
     print(f"Kullanıcı '{username}' oturumu kapatıldı.")
+
+# İlk olarak `hashlib` ve `datetime` kütüphanelerini içe aktardım. Ardından, kullanıcıları dosyaya kaydetmek için `file_manager.py` içindeki fonksiyonları ekledim.
+# `hash_password` fonksiyonunda parolayı UTF-8’e çevirip SHA256 algoritmasıyla şifreledim. Sonra yeni kullanıcı kaydı için `register_user` fonksiyonunu yazdım;
+#burada önce kullanıcı adı ve parolanın girilip girilmediğini kontrol ettim, kullanıcı adının önceden var olup olmadığını ve başlangıç bakiyesinin negatif olmadığını denetledim. Tüm bu kontroller geçerse,
+#kullanıcının bilgilerini bir sözlük halinde topladım, parolasını hashledim, oluşturulma zamanını ekledim ve kullanıcıyı `users` sözlüğüne ekleyerek dosyaya kaydettim. Giriş işlemi için `login_user`
+#fonksiyonunu yazarken önce kullanıcının var olup olmadığını kontrol ettim, ardından hesabın kilitli olup olmadığına baktım. Giriş yapan kişinin parolasını yeniden hashleyip sistemde kayıtlı hash’le
+#karşılaştırdım; doğruysa son giriş zamanını güncelledim ve yanlışsa giriş deneme sayısını artırdım. Üç başarısız denemeden sonra hesabın otomatik olarak kilitlenmesini sağladım. Son olarak da 
+#`logout_user` fonksiyonunda sadece oturum kapatan kullanıcının adını ekrana yazdırarak basit bir çıkış işlemi gerçekleştirdim. Bu adımların tamamı, sistemin düzgün çalışması ve
+#güvenli olması için birbirini tamamlayacak şekilde tasarlandı.
