@@ -1,188 +1,119 @@
-
-from datetime import datetime #Yapılan her işlemin tarih ve saat damgasını (timestamp) kaydetmek için kullanılır.
+from datetime import datetime
 import file_manager
 
-# Fonksiyonlar, daha sonra main.py'de diskten yüklenen `users` ve `transactions` nesnelerini almalıdır.
+# --- YARDIMCI FONKSİYONLAR ---
 
-# Kısıtlama: Try/except kullanılamadığı için hatalar raise edilir.
-
-def generate_transaction_id(transactions: List) -> str:
-    """Benzersiz bir işlem kimliği (ID) oluşturur."""
-    # Basit ID üretimi: Mevcut işlem sayısına +1 eklenir
+def generate_transaction_id(transactions):
+  """
+Her işleme benzersiz bir ID numarası verir.
+Mantık: Mevcut işlem sayısına 1 ekleyerek her seferinde yeni bir numara üretir.
+Liste uzunluğuna 1 ekler ve başına TXN- koyar (Örn: TXN-00001)
+"""
     return f"TXN-{len(transactions) + 1:05d}" 
 
-def record_transaction(transactions: List, user: Dict, transaction_type: str, amount: float, channel: str, notes: str) -> Dict:
-    """Bir işlem kaydı oluşturur ve global işlem listesine ekler."""
+def record_transaction(transactions, user, transaction_type, amount, channel, notes):
+    """Yapılan işlemi hem genel listeye hem kullanıcı geçmişine kaydeder."""
     
+    # İşlem bilgilerini bir paket (sözlük) haline getiriyoruz
     new_txn = {
         "id": generate_transaction_id(transactions),
         "type": transaction_type,
         "amount": amount,
-        "balance_after": user["balance"], # İşlem sonrası bakiye [cite: 39]
-        "timestamp": datetime.now().isoformat(), # Zaman damgası [cite: 39]
+        "balance_after": user["balance"],
+        ,#user' adlı sözlüğün içindeki
+# 'balance' anahtarına ait değeri çekip çıkarmak için kullanılır.
+        "timestamp": datetime.now().isoformat(),
+        # datetime.now().isoformat() : İşlemin yapıldığı anı (Yıl-Ay-Gün Saat:Dakika)
+# dünya standartlarında bir metin olarak kaydeder. Örn: 2025-05-20T14:30:00
         "notes": notes,
-        "username": user["username"], # İşlemin hangi kullanıcıya ait olduğunu izleme
-        "channel": channel # Kanal bilgisi [cite: 39]
+        "username": user["username"],
+        "channel": channel
     }
     
+    # Bankanın tüm işlemlerinin olduğu listeye ekle
     transactions.append(new_txn)
-    # Ayrıca kullanıcının kendi işlem listesine de eklenir [cite: 98]
-    user["transactions"].append({k: new_txn[k] for k in new_txn if k != "username"}) # Kullanıcının kendi listesine username hariç ekle
+    
+    # Kullanıcının kendi özel geçmişine ekle
+    user["transactions"].append(new_txn)
     
     return new_txn
 
-def check_balance(user: Dict) -> float:
-    """Kullanıcının mevcut bakiyesini döndürür."""
-    return user.get("balance", 0.0) # Bakiye kontrolü [cite: 47]
+# --- ANA BANKACILIK FONKSİYONLARI ---
 
-def deposit_money(users: Dict, transactions: List, username: str, amount: float, channel: str = "branch") -> Dict:
-    """Hesaba para yatırma işlemini gerçekleştirir."""
+def check_balance(user):
+    """Kullanıcının o anki parasını gösterir."""
+    return user.get("balance", 0.0)#"balance" bilgisini ara; bulamazsa 0 kabul et.
+
+def deposit_money(users, transactions, username, amount, channel="branch"):
+    """Hesaba para yatırır."""
     user = users.get(username)
     if not user:
-        raise ValueError(f"Kullanıcı '{username}' bulunamadı.")
-        
-    if amount <= 0: # Negatif veya sıfır miktarı reddet [cite: 110]
-        raise ValueError("Yatırma miktarı pozitif olmalıdır.")
-
-    # Bakiye atomik olarak güncellenir (Tekrar okuma/yazma gerekliliğini simüle etmek için) [cite: 39]
-    # Try/except kullanılamadığı için, hata oluşursa veri tutarsızlığı olabilir.
-    user["balance"] += amount
-    
-    # İşlem kaydı oluştur [cite: 39]
-    transaction = record_transaction(
-        transactions=transactions,
-        user=user,
-        transaction_type="deposit",
-        amount=amount,
-        channel=channel,
-        notes=f"Deposit via {channel}"
-    )
-
-    return transaction
-
-
-def withdraw_money(users: Dict, transactions: List, username: str, amount: float, channel: str = "branch") -> Dict:
-    """Hesaptan para çekme işlemini gerçekleştirir."""
-    user = users.get(username)
-    if not user:
-        raise ValueError(f"Kullanıcı '{username}' bulunamadı.")
-
-    if amount <= 0: # Negatif veya sıfır miktarı reddet [cite: 110]
-        raise ValueError("Çekme miktarı pozitif olmalıdır.")
-        
-    # Yapılandırma verilerini yükle
-    _, _, config = file_manager.load_data()
-    min_balance = config["min_balance"]
-
-    # Overdraft (eksi bakiye) önleme kontrolü [cite: 41]
-    if user["balance"] - amount < min_balance:
-        # Minimum bakiye kuralını ihlal ediyor [cite: 41]
-        raise ValueError(f"Yetersiz bakiye. İşlemden sonra bakiye en az {min_balance} olmalıdır.")
-
-    # Bakiye atomik olarak güncellenir [cite: 39]
-    user["balance"] -= amount
-    
-    # İşlem kaydı oluştur
-    transaction = record_transaction(
-        transactions=transactions,
-        user=user,
-        transaction_type="withdrawal",
-        amount=amount,
-        channel=channel,
-        notes=f"Withdrawal via {channel}"
-    )
-
-    return transaction
-
-def transfer_funds(users: Dict, transactions: List, sender_username: str, receiver_username: str, amount: float) -> Tuple[Dict, Dict]:
-    """Hesaplar arasında para transferi gerçekleştirir."""
-    sender = users.get(sender_username)
-    receiver = users.get(receiver_username)
-    
-    if not sender:
-        raise ValueError(f"Gönderen kullanıcı '{sender_username}' bulunamadı.")
-    if not receiver:
-        raise ValueError(f"Alıcı kullanıcı '{receiver_username}' bulunamadı.")
-    if sender_username == receiver_username:
-        raise ValueError("Kendinize transfer yapamazsınız.")
+        print("Hata: Kullanıcı bulunamadı!")
+        return
 
     if amount <= 0:
-        raise ValueError("Transfer miktarı pozitif olmalıdır.")
+        print("Hata: Yatırılacak tutar 0'dan büyük olmalı!")
+        return
+
+    # Bakiyeyi güncelle
+    user["balance"] += amount
+    
+    # Kaydı oluştur
+    record_transaction(transactions, user, "deposit", amount, channel, "Para Yatırma")
+    print(f"{amount} TL başarıyla yatırıldı.")
+
+def withdraw_money(users, transactions, username, amount, channel="branch"):
+    """Hesaptan para çeker."""
+    user = users.get(username)
+    if not user:
+        print("Hata: Kullanıcı bulunamadı!")
+        return
+
+    if amount <= 0:
+        print("Hata: Çekilecek tutar 0'dan büyük olmalı!")
+        return
         
-    # Yapılandırma verilerini yükle
-    _, _, config = file_manager.load_data()
-    min_balance = config["min_balance"]
-    
-    # Overdraft (eksi bakiye) önleme kontrolü
-    if sender["balance"] - amount < min_balance:
-        raise ValueError(f"Gönderenin bakiyesi yetersiz. İşlemden sonra bakiye en az {min_balance} olmalıdır.")
+    # Ayarları dosyadan oku (Minimum bakiye kontrolü için)
+    # file_manager içinden sadece gerekli olan config kısmını alıyoruz
+    veriler = file_manager.load_data()
+    config = veriler[2] # 3. sıradaki bilgi ayarlar (config)
+    min_bakiye = config["min_balance"]
+    # config: Bankanın çalışma kurallarını (limitler, faiz oranları vb.)
+# içeren "Ayarlar" bölümüdür. Kodun dışından kolayca değiştirilebilir.
 
-    # 1. Gönderenden düşme (Debit)
-    sender["balance"] -= amount
-    
-    # 2. Alıcıya ekleme (Credit) [cite: 40]
-    receiver["balance"] += amount
-    
-    # 3. İşlem kayıtlarını oluşturma (Gönderen ve Alıcı için ayrı ayrı) [cite: 40]
-    
-    # Gönderen işlemi (Debit)
-    sender_txn = record_transaction(
-        transactions=transactions,
-        user=sender,
-        transaction_type="transfer_out",
-        amount=amount,
-        channel="Transfer",
-        notes=f"Transfer to {receiver_username}"
-    )
+    # Yetersiz bakiye kontrolü
+    if user["balance"] - amount < min_bakiye:
+        print(f"Hata: Yetersiz bakiye! En az {min_bakiye} TL kalmalı.")
+        return
 
-    # Alıcı işlemi (Credit)
-    receiver_txn = record_transaction(
-        transactions=transactions,
-        user=receiver,
-        transaction_type="transfer_in",
-        amount=amount,
-        channel="Transfer",
-        notes=f"Transfer from {sender_username}"
-    )
+    # Bakiyeyi düşür ve kaydet
+    user["balance"] -= amount
+    record_transaction(transactions, user, "withdrawal", amount, channel, "Para Çekme")
+    print(f"{amount} TL başarıyla çekildi.")
 
-    return sender_txn, receiver_txn
+def transfer_funds(users, transactions, gonderen_ad, alici_ad, miktar):
+    """Bir hesaptan diğerine para gönderir."""
+    gonderen = users.get(gonderen_ad)
+    alici = users.get(alici_ad)
+    
+    if not gonderen or not alici:
+        print("Hata: Kullanıcılardan biri bulunamadı!")
+        return
 
-def apply_interest(user: Dict, rate: float) -> Dict:
-    """Kullanıcının bakiyesine faiz uygular."""
-    interest_amount = user["balance"] * rate
-    
-    if interest_amount > 0:
-        user["balance"] += interest_amount
-        
-        # Faiz işlemini kaydet
-        transaction = record_transaction(
-            transactions=file_manager.load_data()[1], # Global transaction listesini yükle
-            user=user,
-            transaction_type="interest_accrual",
-            amount=interest_amount,
-            channel="System",
-            notes="Monthly interest application"
-        )
-        return transaction
-    
-    return {} # Faiz uygulanmadı
+    if miktar <= 0:
+        print("Hata: Geçersiz miktar!")
+        return
 
-def calculate_monthly_fees(user: Dict, fee_schedule: Dict) -> Dict:
-    """Kullanıcının bakiyesinden aylık ücretleri düşer."""
-    fee_amount = fee_schedule.get("monthly_fee", 0.0)
+    if gonderen["balance"] < miktar:
+        print("Hata: Gönderen bakiyesi yetersiz!")
+        return
+
+    # Parayı birinden düş, diğerine ekle
+    gonderen["balance"] -= miktar
+    alici["balance"] += miktar
     
-    if fee_amount > 0 and user["balance"] >= fee_amount:
-        user["balance"] -= fee_amount
-        
-        # Ücret işlemini kaydet
-        transaction = record_transaction(
-            transactions=file_manager.load_data()[1], # Global transaction listesini yükle
-            user=user,
-            transaction_type="fee",
-            amount=fee_amount,
-            channel="System",
-            notes="Monthly service fee"
-        )
-        return transaction
+    # Her iki taraf için de dekont/kayıt oluştur
+    record_transaction(transactions, gonderen, "transfer_out", miktar, "Transfer", f"{alici_ad} kişisine gönderildi")
+    record_transaction(transactions, alici, "transfer_in", miktar, "Transfer", f"{gonderen_ad} kişisinden geldi")
     
-    return {} # Ücret uygulanmadı
+    print(f"{miktar} TL transfer başarıyla tamamlandı.")
