@@ -1,5 +1,5 @@
 
-from datetime import datetime
+from datetime import datetime #Yapılan her işlemin tarih ve saat damgasını (timestamp) kaydetmek için kullanılır.
 import file_manager
 
 # Fonksiyonlar, daha sonra main.py'de diskten yüklenen `users` ve `transactions` nesnelerini almalıdır.
