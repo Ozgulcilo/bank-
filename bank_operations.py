@@ -20,7 +20,7 @@ def record_transaction(transactions, user, transaction_type, amount, channel, no
         "type": transaction_type,
         "amount": amount,
         "balance_after": user["balance"],
-        ,#user' adlı sözlüğün içindeki
+        #user' adlı sözlüğün içindeki
 # 'balance' anahtarına ait değeri çekip çıkarmak için kullanılır.
         "timestamp": datetime.now().isoformat(),
         # datetime.now().isoformat() : İşlemin yapıldığı anı (Yıl-Ay-Gün Saat:Dakika)
