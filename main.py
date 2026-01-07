@@ -50,7 +50,7 @@ def main():
             print(f"Bakiyeniz: {b} TL")
 
         elif secim == "2":
-            m miktar = float(input("Miktar: "))
+            miktar = float(input("Miktar: "))
             bank_operations.deposit_money(users, transactions, aktif_kullanici["username"], miktar)
             file_manager.save_data(users, transactions, config) # Değişikliği kaydet
 
