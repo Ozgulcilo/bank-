@@ -8,7 +8,7 @@ def generate_transaction_id(transactions):
 Her işleme benzersiz bir ID numarası verir.
 Mantık: Mevcut işlem sayısına 1 ekleyerek her seferinde yeni bir numara üretir.
 Liste uzunluğuna 1 ekler ve başına TXN- koyar (Örn: TXN-00001)
-"""
+  """
     return f"TXN-{len(transactions) + 1:05d}" 
 
 def record_transaction(transactions, user, transaction_type, amount, channel, notes):
